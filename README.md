@@ -56,6 +56,7 @@ El backend de Fase 2 expone una API FastAPI con persistencia SQLite en `turnos.d
 | [tareas.md](tareas.md) | Tareas organizadas en fases para ejecutar el plan y el backend |
 | [index.html](index.html) | La aplicación completa en un solo archivo (dominio, estado, vistas y datos de ejemplo) |
 | [main.py](main.py) | API FastAPI independiente con autenticación Bearer y persistencia SQLite |
+| [seed_demo.py](seed_demo.py) | Carga local protegida de cuentas y datos demo para probar la API |
 | [requirements.txt](requirements.txt) | Dependencias del backend |
 | [requirements-dev.txt](requirements-dev.txt) | Dependencias para ejecutar las pruebas |
 | [test_main.py](test_main.py) | Pruebas de API, reglas, concurrencia y persistencia |
@@ -209,7 +210,7 @@ export TURNOS_TOKEN_SECRET="$(openssl rand -hex 32)"
 
 La API queda disponible en `http://127.0.0.1:8000` y Swagger UI en [`http://127.0.0.1:8000/docs`](http://127.0.0.1:8000/docs). El backend crea `turnos.db` al iniciar. `TURNOS_TIMEZONE` es opcional y por defecto vale `UTC`; `TURNOS_DB_PATH` permite elegir otra ubicación para la base.
 
-Las rutas de turnos requieren `Authorization: Bearer <access_token>`. Se obtiene un token en `POST /api/auth/login` con credenciales de un usuario ya existente. El backend no incluye alta/registro de usuarios ni datos de demostración.
+Las rutas de turnos requieren `Authorization: Bearer <access_token>`. Se obtiene un token en `POST /api/auth/login`. Para crear cuentas y datos de prueba en una base vacía, ejecutá `./.venv/bin/python seed_demo.py` antes de iniciar el servidor; el script genera una contraseña aleatoria y la muestra una sola vez. Para agregar clientes sin modificar los datos existentes, usá `./.venv/bin/python seed_demo.py --more-clients 2`. No incluye una ruta pública de registro.
 
 Para correr las pruebas: `python -m pip install -r requirements-dev.txt` y `python -m pytest -q test_main.py`.
 

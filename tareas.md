@@ -154,6 +154,7 @@ Esta fase sigue el contrato vigente de [spec.md](spec.md) v0.3.0 y la arquitectu
 - [x] 9.6 Implementar `POST /api/turnos/{id}/cancelar` con permisos, transición de estado y ventana INV-01/RN-01.
 - [x] 9.7 Verificar los errores de dominio ejercitados, persistencia tras reinicio, auditoría y concurrencia de reservas.
 - [x] 9.8 Documentar dependencias necesarias, comando `uvicorn --reload` y URL de Swagger UI.
+- [x] 9.9 Añadir un script local de datos demo con credenciales aleatorias y protección contra mezcla con datos existentes.
 
 **Salida:** backend FastAPI independiente con persistencia SQLite.
 **Hecho cuando:** los endpoints cumplen el contrato vigente, las reglas se aplican en servidor y los datos sobreviven al reinicio.
