@@ -39,12 +39,12 @@ Un fork crea una copia del repositorio en tu propia cuenta de GitHub. Es útil s
 
 ## Qué es
 
-Una aplicación web para reservar turnos con profesionales. Tiene dos vistas sobre los mismos datos en memoria:
+El repositorio contiene un prototipo web para reservar turnos y un backend REST separado. El prototipo conserva sus dos vistas sobre datos en memoria:
 
 - **Vista Cliente:** elegir servicio, ver horarios libres, reservar, confirmar y cancelar turnos propios.
 - **Vista Administrador:** agenda, métricas, bloqueos de horarios, servicios, auditoría y acciones sobre los turnos.
 
-Las reglas del negocio (sin doble reserva, cancelación hasta 2 horas antes, datos de contacto válidos, permisos por rol) están implementadas tal como las define el spec. La pantalla no decide qué está permitido: cada acción pasa por un módulo de dominio que responde con códigos de error como `SLOT_UNAVAILABLE`.
+El backend de Fase 2 expone una API FastAPI con persistencia SQLite en `turnos.db`; las reglas de negocio y permisos se validan en el servidor según [spec.md](spec.md). El prototipo HTML todavía no consume esta API.
 
 ## Archivos del proyecto
 
@@ -52,9 +52,13 @@ Las reglas del negocio (sin doble reserva, cancelación hasta 2 horas antes, dat
 |---|---|
 | [spec.md](spec.md) | Especificación técnica: alcance del MVP, roles y permisos, reglas invariantes y modelo de datos |
 | [historias-de-usuario.md](historias-de-usuario.md) | 7 historias de los dos flujos principales, con criterios en Gherkin y casos borde |
-| [plan.md](plan.md) | Plan para convertir la especificación en un prototipo interactivo |
-| [tareas.md](tareas.md) | Tareas organizadas en 9 fases para ejecutar el plan |
+| [plan.md](plan.md) | Arquitectura desacoplada de tres capas |
+| [tareas.md](tareas.md) | Tareas organizadas en fases para ejecutar el plan y el backend |
 | [index.html](index.html) | La aplicación completa en un solo archivo (dominio, estado, vistas y datos de ejemplo) |
+| [main.py](main.py) | API FastAPI independiente con autenticación Bearer y persistencia SQLite |
+| [requirements.txt](requirements.txt) | Dependencias del backend |
+| [requirements-dev.txt](requirements-dev.txt) | Dependencias para ejecutar las pruebas |
+| [test_main.py](test_main.py) | Pruebas de API, reglas, concurrencia y persistencia |
 | [guia-de-uso.md](guia-de-uso.md) | Funcionalidades y guía paso a paso de pruebas en la interfaz |
 
 ## Cómo se construyó: paso a paso
@@ -142,7 +146,7 @@ Se aprobó el plan y se pidió dejarlo por escrito, más una lista de tareas por
 guarda el plan en el archivo plan.md y luego genera un archivo tareas.md organizado en fases para cumplir ese plan
 ```
 
-**Resultado:** [plan.md](plan.md) y [tareas.md](tareas.md), este último con 9 fases (preparación, dominio, estado, interfaz compartida, vista Cliente, vista Administrador, integración, verificación y publicación), cada una con su criterio de cierre.
+**Resultado:** [plan.md](plan.md) y [tareas.md](tareas.md), este último con 10 fases (preparación, dominio, estado, interfaz compartida, vista Cliente, vista Administrador, integración, verificación, publicación y backend), cada una con su criterio de cierre.
 
 ### Paso 5 — Construcción del prototipo (`index.html`)
 
@@ -192,12 +196,30 @@ Abrí [index.html](index.html) y seguí [guia-de-uso.md](guia-de-uso.md). Tres p
 2. **Regla de las 2 horas:** pulsá `+1 min` en el reloj simulado y probá cancelar el turno de las 09:30. Con **Modo auditoría** activado, el dominio lo rechaza con `CANCELLATION_WINDOW_EXPIRED`.
 3. **Doble reserva:** en el modal de reserva, activá la simulación de otro cliente en el mismo instante. Queda un solo turno.
 
+### Backend
+
+Creá un entorno virtual e instalá las dependencias. El token de autenticación requiere un secreto local de al menos 32 bytes; no lo guardes en el repositorio. En Bash:
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+export TURNOS_TOKEN_SECRET="$(openssl rand -hex 32)"
+.venv/bin/uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+La API queda disponible en `http://127.0.0.1:8000` y Swagger UI en [`http://127.0.0.1:8000/docs`](http://127.0.0.1:8000/docs). El backend crea `turnos.db` al iniciar. `TURNOS_TIMEZONE` es opcional y por defecto vale `UTC`; `TURNOS_DB_PATH` permite elegir otra ubicación para la base.
+
+Las rutas de turnos requieren `Authorization: Bearer <access_token>`. Se obtiene un token en `POST /api/auth/login` con credenciales de un usuario ya existente. El backend no incluye alta/registro de usuarios ni datos de demostración.
+
+Para correr las pruebas: `python -m pip install -r requirements-dev.txt` y `python -m pytest -q test_main.py`.
+
 ## Límites conocidos
 
-- No hay persistencia: al recargar, los datos vuelven al estado inicial.
-- No hay inicio de sesión real; el rol se elige con un selector para poder auditar permisos.
+- El prototipo en [index.html](index.html) sigue sin persistencia: al recargar, los datos vuelven al estado inicial. El backend sí persiste los turnos.
+- No hay inicio de sesión real en el prototipo; el rol se elige con un selector para poder auditar permisos.
 - Los emails son simulados.
-- La concurrencia está simulada: las acciones se procesan una detrás de otra. En un sistema real, la garantía contra la doble reserva debe vivir en la base de datos.
+- El backend aún no conecta un proveedor de correo ni aplica rate limiting; estos requisitos del MVP siguen pendientes.
+- La concurrencia del prototipo está simulada; el backend serializa las reservas en SQLite.
 - Quedan fuera del prototipo: la reserva en nombre de un cliente, el cambio de horario laboral con turnos ya reservados y el alta de servicios nuevos.
 
 ## Tecnologías

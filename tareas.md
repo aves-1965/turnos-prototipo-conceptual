@@ -142,6 +142,24 @@ Probar en el navegador integrado y registrar el resultado observado:
 
 ---
 
+## Fase 9 — Backend desacoplado y persistencia real
+
+Esta fase sigue el contrato vigente de [spec.md](spec.md) v0.3.0 y la arquitectura de [plan.md](plan.md) v0.3.0. Si una instrucción operativa contradice esos documentos, no se agregan campos, entidades ni estados: primero se actualiza y aprueba el contrato formal.
+
+- [x] 9.1 Formalizar autenticación Bearer y `POST /api/auth/login` en spec §2.4; cargar rol/estado actual desde la base de datos en cada solicitud protegida.
+- [x] 9.2 Crear `main.py` con FastAPI, CORS para el frontend local y SQLite `turnos.db`; crear únicamente el esquema correspondiente a las entidades y atributos de spec §4.
+- [x] 9.3 Implementar `POST /api/auth/login` y verificar tokens Bearer; usar la configuración criptográfica y expiración de spec §2.4.
+- [x] 9.4 Implementar `GET /api/turnos` según los permisos y la representación definidos en spec §3.
+- [x] 9.5 Implementar `POST /api/turnos` con validación de dominio, cálculo de `fin` y transacción atómica conforme a RN-02, RN-03, RN-04 e INV-03.
+- [x] 9.6 Implementar `POST /api/turnos/{id}/cancelar` con permisos, transición de estado y ventana INV-01/RN-01.
+- [x] 9.7 Verificar los errores de dominio ejercitados, persistencia tras reinicio, auditoría y concurrencia de reservas.
+- [x] 9.8 Documentar dependencias necesarias, comando `uvicorn --reload` y URL de Swagger UI.
+
+**Salida:** backend FastAPI independiente con persistencia SQLite.
+**Hecho cuando:** los endpoints cumplen el contrato vigente, las reglas se aplican en servidor y los datos sobreviven al reinicio.
+
+---
+
 ## Resumen de dependencias
 
 ```
@@ -150,3 +168,5 @@ F0 Preparación → F1 Dominio → F2 Estado → F3 UI compartida → F4 Cliente
 ```
 
 F4 y F5 pueden avanzar en paralelo una vez cerrada la Fase 3, porque ambas consumen el mismo `store` y no se tocan entre sí.
+
+Fase 9 implementa autenticación según el contrato aprobado en spec §2.4; su verificación sigue los criterios de aceptación y errores de `spec.md`.

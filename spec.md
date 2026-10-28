@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 0.1.0 (MVP) |
-| Estado | Borrador para revisión |
+| Versión | 0.3.0 (Fase 2) |
+| Estado | Contrato actualizado para arquitectura desacoplada |
 | Metodología | Spec-Driven Development (SDD) |
-| Fecha | 2026-10-26 |
+| Fecha | 2026-10-28 |
 
 > Este documento es el **contrato del sistema**. Todo código, test y decisión de diseño debe poder trazarse a una sección de este archivo. Si el código y la spec divergen, se corrige primero la spec y luego el código.
 
@@ -99,13 +99,24 @@ Leyenda: ✅ permitido · ❌ prohibido · 🔒 solo sobre recursos propios
 - **RBAC-03**: El rol se asigna únicamente por un `ADMIN`; el auto-registro siempre crea `CLIENTE`.
 - **RBAC-04**: Un `CLIENTE` NO DEBE poder ver datos de contacto de otros clientes. El `PROFESIONAL` solo ve los datos de contacto de clientes con turnos en su agenda.
 
+### 2.4 Autenticación HTTP
+
+- Los endpoints de turnos requieren un token de acceso Bearer válido. El inicio de sesión es el único endpoint de esta sección que no requiere token.
+- `POST /api/auth/login` recibe `email` y `password` en JSON y valida las credenciales contra `Usuario.email` y `Usuario.password_hash`. La contraseña se verifica con el algoritmo adaptativo con el que fue almacenada (Argon2id o bcrypt); nunca se almacena ni se devuelve en claro.
+- Si las credenciales no son válidas o el usuario está inactivo, se responde `401` con `INVALID_CREDENTIALS`, sin revelar cuál dato falló.
+- Respuesta `200 OK`: `access_token`, `token_type` (`Bearer`) y `expires_in` en segundos.
+- El token es firmado con HS256 usando el secreto configurado en la variable de entorno `TURNOS_TOKEN_SECRET`. El secreto NO DEBE tener un valor por defecto ni estar guardado en el repositorio; el servicio NO DEBE iniciar si falta.
+- El token contiene el identificador de `Usuario` en `sub` y una expiración `exp`; su duración predeterminada es 30 minutos. No contiene una autoridad de rol: en cada solicitud protegida, el backend DEBE cargar el usuario y su rol/estado vigente desde la base de datos.
+- La falta de token, firma inválida, expiración o usuario inactivo responde `401` con `UNAUTHORIZED`.
+- En producción, el inicio de sesión y el uso de tokens DEBEN realizarse sobre HTTPS, conforme a los requisitos de seguridad de la sección 6.
+
 ---
 
 ## 3. Reglas Invariantes del Negocio
 
 Las siguientes reglas son **no negociables**: se validan en el backend, y la base de datos DEBE reforzarlas con restricciones cuando sea técnicamente posible. Ninguna regla puede ser omitida por la UI ni por un rol (salvo excepción explícita indicada).
 
-### RN-01 — Ventana mínima de cancelación
+### INV-01 / RN-01 — Ventana mínima de cancelación
 
 - Un `CLIENTE` NO DEBE cancelar un turno si faltan **menos de 2 horas** para su `inicio`.
 - Valor configurable (`CANCELLATION_WINDOW_HOURS`, default `2`); el cálculo usa `inicio - ahora(UTC)`.
@@ -113,7 +124,7 @@ Las siguientes reglas son **no negociables**: se validan en el backend, y la bas
 - **Excepción**: `PROFESIONAL`/`ADMIN` PUEDEN cancelar fuera de ventana, con motivo obligatorio, y el cliente DEBE ser notificado.
 - Respuesta ante violación: error `CANCELLATION_WINDOW_EXPIRED` (HTTP 409).
 
-### RN-02 — Prohibición de doble reserva y solapamiento
+### INV-02 / RN-02 — Prohibición de doble reserva y solapamiento
 
 - Para un mismo profesional, dos turnos en estado activo (`CONFIRMADO`) NO DEBEN solaparse en el tiempo.
 - Se define el solapamiento sobre intervalos semiabiertos `[inicio, fin)`: dos turnos A y B se solapan si `A.inicio < B.fin` **y** `B.inicio < A.fin`. Turnos contiguos (`A.fin == B.inicio`) son válidos.
@@ -122,6 +133,45 @@ Las siguientes reglas son **no negociables**: se validan en el backend, y la bas
 - **Garantía ante concurrencia**: la verificación DEBE ser atómica. Se exige restricción a nivel de base de datos (p. ej. `EXCLUDE USING gist` sobre rango temporal por profesional en PostgreSQL, o transacción con bloqueo + índice único equivalente). Una validación solo en la aplicación NO es suficiente.
 - Los turnos `CANCELADO` NO participan del control de solapamiento (el slot se libera).
 - Respuesta ante violación: error `SLOT_UNAVAILABLE` (HTTP 409).
+
+### INV-03 — Persistencia Real
+
+- Los turnos DEBEN persistirse de forma atómica en una base de datos relacional.
+- Una reserva o cancelación DEBE confirmarse por completo o no producir cambios persistidos; no se admiten escrituras parciales.
+- Los turnos persistidos DEBEN sobrevivir al reinicio del backend y del sistema.
+- La persistencia DEBE conservar las entidades y atributos definidos en la sección 4; esta regla no autoriza agregar entidades ni campos al modelo.
+
+### Contrato REST de turnos
+
+Los siguientes endpoints conforman el contrato HTTP para consultar y gestionar turnos. Las representaciones de turno utilizan exclusivamente los atributos definidos en la sección 4.1.
+
+Todos requieren autenticación Bearer y autorización según RBAC, salvo el endpoint de inicio de sesión definido en la sección 2.4.
+
+#### `POST /api/auth/login`
+
+- Solicitud `application/json`: `email` y `password`.
+- Respuesta `200 OK`: `access_token`, `token_type` (`Bearer`) y `expires_in`, conforme a la sección 2.4.
+- Error: `INVALID_CREDENTIALS` (401).
+
+#### `GET /api/turnos`
+
+- Lista los turnos que el actor autenticado tiene permiso de consultar según RBAC-01 y RBAC-02: el `CLIENTE` solo consulta los propios, el `PROFESIONAL` los de su agenda y el `ADMIN` todos.
+- Respuesta `200 OK`: arreglo de objetos `Turno`, con los atributos definidos en la sección 4.1.
+- No admite filtros ni parámetros adicionales en esta versión del contrato.
+
+#### `POST /api/turnos`
+
+- Crea una reserva para el `CLIENTE` autenticado o, por parte del `ADMIN`, en nombre de un cliente, aplicando las reglas RN-02, RN-03, RN-04 e INV-03.
+- Solicitud `application/json`: `profesional_id`, `servicio_id` e `inicio`; el `ADMIN` incluye también `cliente_id`. Para el `CLIENTE`, `cliente_id` corresponde al actor autenticado y no se toma del cuerpo. `fin` se calcula en el servidor según RN-04.
+- Respuesta `201 Created`: objeto `Turno` persistido, con los atributos definidos en la sección 4.1.
+- Errores de dominio: `SLOT_UNAVAILABLE` (409), `INVALID_CONTACT` (422), `EMAIL_NOT_VERIFIED` (403) o `INVALID_TIME_RANGE` (422), según corresponda.
+
+#### `POST /api/turnos/{id}/cancelar`
+
+- Cancela el turno identificado por `{id}`, verificando permisos y aplicando RN-01. La excepción de `PROFESIONAL`/`ADMIN` se rige por RN-01 y requiere `motivo_cancelacion`.
+- Para `PROFESIONAL`/`ADMIN`, el cuerpo JSON contiene `motivo_cancelacion`. Para el `CLIENTE` no se requiere cuerpo.
+- Respuesta `200 OK`: objeto `Turno` actualizado, con los atributos definidos en la sección 4.1.
+- Errores de dominio: `CANCELLATION_WINDOW_EXPIRED` (409), `INVALID_STATE_TRANSITION` (409) o `NOT_FOUND` (404), según corresponda.
 
 ### RN-03 — Validación obligatoria de datos de contacto
 
@@ -136,7 +186,7 @@ Las siguientes reglas son **no negociables**: se validan en el backend, y la bas
 - `fin = inicio + duración del servicio`; el cliente NO DEBE enviar `fin` (se calcula en servidor).
 - El `inicio` DEBE estar alineado a la grilla de slots del profesional (default: 15 min).
 - Existe un **horizonte máximo de reserva** (default: 60 días).
-- Todos los instantes se almacenan en UTC y se muestran en la zona horaria de operación.
+- Todos los instantes se almacenan en UTC y se muestran en la zona horaria de operación. La zona horaria de operación se configura mediante `TURNOS_TIMEZONE`; su valor por defecto es `UTC`.
 
 ### RN-05 — Bloqueos horarios
 
@@ -340,6 +390,9 @@ Alcance: el `PROFESIONAL` ve solo las suyas; el `ADMIN` ve las globales y por pr
 | `INVALID_STATE_TRANSITION` | 409 | RN-06 |
 | `SERVICE_HAS_ACTIVE_BOOKINGS` | 409 | RN-07 |
 | `FORBIDDEN` / `NOT_FOUND` | 403 / 404 | RBAC-01, RBAC-02 |
+| `INVALID_CREDENTIALS` / `UNAUTHORIZED` | 401 | Sección 2.4 |
+| `INVALID_REQUEST` | 422 | Solicitud que no cumple el contrato del endpoint |
+| `REASON_REQUIRED` | 422 | RN-01, cancelación por Profesional/Admin sin motivo |
 
 ---
 
