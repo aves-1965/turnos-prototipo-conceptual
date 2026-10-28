@@ -1,0 +1,19 @@
+Actuá como un Ingeniero Backend Senior en Python y FastAPI.
+Tomando como ÚNICA FUENTE DE VERDAD el contrato `spec.md` y las decisiones técnicas de `plan.md` que acabamos de consolidar. Actualiza antes de generar cualquier código `tareas.md` para:
+
+Generá el archivo `main.py` de nuestro backend independiente aplicando las siguientes restricciones de ingeniería:
+
+1. CONFIGURACIÓN DEL SERVIDOR:
+   - Inicializá FastAPI con middleware de CORS permisivo (allow_origins=["*"]) para admitir llamadas fetch locales desde el frontend.
+   - Configurá la conexión a la base de datos relacional SQLite (`turnos.db`) utilizando sqlite3 nativo o SQLAlchemy.
+   - Asegurá que la tabla `turnos` se cree automáticamente al iniciar el servidor respetando estrictamente el modelo conceptual de spec.md (id, cliente_nombre, cliente_email, servicio, fecha_hora, estado).
+
+2. IMPLEMENTACIÓN DE ENDPOINTS SEGÚN CONTRATO:
+   - GET /api/turnos: Consulta y devuelve todos los turnos registrados en SQLite en formato JSON (HTTP 200).
+   - POST /api/turnos: Valida los datos de entrada con Pydantic. Aplica la regla INV-02 en el servidor: si ya existe un turno CONFIRMADO en ese horario, rechaza con HTTP 409 y mensaje del spec ("HORARIO_NO_DISPONIBLE"). Si está libre, inserta el turno en SQLite (HTTP 201).
+   - POST /api/turnos/{id}/cancelar: Aplica la regla INV-01 en el servidor: calcula la diferencia horaria con el reloj actual; si faltan menos de 2 horas para el inicio, rechaza con HTTP 409 ("CANCELACION_FUERA_DE_VENTANA"). Si faltan 2 horas o más, actualiza el estado a "CANCELADO_CLIENTE" en SQLite (HTTP 200).
+
+3. ENTREGA TÉCNICA:
+   - El código completo y modular de `main.py` con tipado estricto.
+   - El comando de terminal exacto para levantar el servidor con uvicorn en modo recarga automática (`--reload`).
+   - La URL para auditar y probar los endpoints en vivo en Swagger UI (/docs).

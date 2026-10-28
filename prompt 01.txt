@@ -1,0 +1,30 @@
+Actuá como un Arquitecto de Software Senior bajo la metodología Spec-Driven Development (SDD).
+Estamos trabajando en el repositorio local que acabamos de clonar del proyecto "Sistema de Turnos".
+
+Tus ÚNICAS fuentes de la verdad son los archivos actuales del repositorio:
+- El contrato formal en `spec.md`
+- El plan técnico en `plan.md`
+- El prototipo interactivo en `index.html`
+
+Iniciamos la Fase 2 (Módulo 4: Arquitectura Desacoplada y Software Real).
+Antes de escribir una sola línea de código, necesitamos actualizar la documentación técnica:
+
+1. ACTUALIZACIÓN DE spec.md:
+   - Mantené inmutables las reglas INV-01 (ventana de cancelación >= 2 h) e INV-02 (prohibición de solapamiento).
+   - Incorporá formalmente la regla "INV-03 (Persistencia Real)": Los turnos deben persistir de forma atómica en una base de datos relacional y sobrevivir al reinicio del sistema.
+   - Definí el contrato de endpoints REST que gobernará el Backend:
+     * GET /api/turnos (listar turnos)
+     * POST /api/turnos (crear reserva)
+     * POST /api/turnos/{id}/cancelar (cancelar reserva aplicando INV-01)
+
+2. ACTUALIZACIÓN DE plan.md:
+   - Diseñá la arquitectura desacoplada de 3 capas:
+     * Capa 1: Frontend (prototipo-turnos.html consumiendo JSON vía HTTP).
+     * Capa 2: Backend (Python con FastAPI en puerto 8000 con CORS habilitado).
+     * Capa 3: Persistencia (Base de datos relacional local con SQLite en turnos.db).
+   - Justificá el desacoplamiento: por qué el almacenamiento en memoria volátil de JS viola la integridad del sistema.
+
+3. DIRECTIVA DE ABSTENCIÓN (GROUNDING ESTRICTO):
+   - Prohibido inventar entidades, tablas o campos que no figuren en la sección 4 de nuestro spec.md (evitar el bug del esquema roto).
+
+Actualiza en spec.md y plan.md a una segunda versión con estas modificaciones

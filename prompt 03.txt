@@ -1,0 +1,19 @@
+Actuá como un Desarrollador Full-Stack Senior.
+Tenemos nuestro servidor FastAPI corriendo en `http://localhost:8000` y nuestro archivo `prototipo-turnos.html` (o `index.html`) que clonamos del repositorio.
+
+Vamos a desacoplar el frontend de la lógica en memoria, respetando la arquitectura de 3 capas:
+
+1. REFACTORIZACIÓN DE LA CAPA DE DATOS EN JAVASCRIPT:
+   - Eliminá el arreglo en memoria estático (`turnos[]` o `turnosMemoria`).
+   - Reemplazalo por una función asíncrona `cargarTurnos()` que consuma vía `fetch('http://localhost:8000/api/turnos')` y renderice las tarjetas en tiempo real.
+   - Modificá el evento de envío del formulario para que haga un `POST` con `Content-Type: application/json` al endpoint `/api/turnos`.
+   - Modificá la acción de cancelar para que envíe una petición `POST` a `/api/turnos/${id}/cancelar`.
+
+2. MANEJO DE ERRORES DEL CONTRATO:
+   - Si la API responde con error HTTP 409 por solapamiento (INV-02) o por cancelación tardía fuera de la ventana de 2 horas (INV-01), capturá el error y mostrá una alerta visual clara al usuario con el motivo del rechazo devuelto por el backend.
+
+3. PRESERVACIÓN DEL DISEÑO:
+   - No toques los estilos de Tailwind CSS ni la estructura visual del HTML. Solo refactorizá la lógica de scripts para conectarla a la API.
+
+4. SEGUIMIENTO SDD EN tareas.md:
+   - Indicame qué tareas específicas de `tareas.MD` debemos marcar como completadas [x] tras verificar que al recargar la página (F5) los datos persisten intactos en SQLite.
